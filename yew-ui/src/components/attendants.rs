@@ -286,14 +286,19 @@ impl AttendantsComponent {
         let mut media_device_access = MediaDeviceAccess::new();
         media_device_access.on_granted = {
             let link = ctx.link().clone();
-            Callback::from(move |_| link.send_message(WsAction::MediaPermissionsGranted))
+            Callback::from(move |_| {
+                log::info!("Media permissions: OK");
+                link.send_message(WsAction::MediaPermissionsGranted)
+            })
         };
         media_device_access.on_denied = {
             let link = ctx.link().clone();
             Callback::from(move |e| {
-                let complete_error = format!("Error requesting permissions: Please make sure to allow access to both camera and microphone. ({e:?})");
-                error!("{complete_error}");
-                link.send_message(WsAction::MediaPermissionsError(complete_error.to_string()))
+                log::info!("Media permissions denied: {:?}", e);
+                let msg = format!(
+                    "Camera/microphone not available. Enable access in your browser settings. ({e:?})"
+                );
+                link.send_message(WsAction::MediaPermissionsError(msg))
             })
         };
         media_device_access
@@ -455,6 +460,7 @@ impl Component for AttendantsComponent {
                     true
                 }
                 WsAction::RequestMediaPermissions => {
+                    log::info!("Requesting media permissions (camera/microphone)");
                     self.media_device_access.request();
                     false
                 }
@@ -481,7 +487,9 @@ impl Component for AttendantsComponent {
                 }
                 WsAction::MediaPermissionsError(error) => {
                     self.error = Some(error);
-                    self.meeting_joined = false; // Stay on join screen if permissions denied
+                    self.pending_mic_enable = false;
+                    self.pending_video_enable = false;
+                    self.pending_screen_share = false;
                     true
                 }
                 WsAction::EncoderSettingsUpdated(settings) => {
@@ -806,7 +814,7 @@ impl Component for AttendantsComponent {
                         </div>
                         <button
                             class="btn-apple btn-primary"
-                            onclick={ctx.link().callback(|_| WsAction::RequestMediaPermissions)}
+                            onclick={ctx.link().callback(|_| WsAction::Connect)}
                         >
                             {"Join Meeting"}
                         </button>
