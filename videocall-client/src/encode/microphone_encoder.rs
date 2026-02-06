@@ -30,6 +30,7 @@ use gloo_utils::window;
 use js_sys::Array;
 use js_sys::Boolean;
 use js_sys::Uint8Array;
+use js_sys::Object;
 use protobuf::Message;
 use std::rc::Rc;
 use std::sync::atomic::Ordering;
@@ -244,7 +245,17 @@ impl MicrophoneEncoder {
             };
             let constraints = MediaStreamConstraints::new();
             let media_info = web_sys::MediaTrackConstraints::new();
-            media_info.set_device_id(&device_id.into());
+
+            // Force exact deviceId match (avoid 'ideal' fallback)
+            let exact = js_sys::Object::new();
+            js_sys::Reflect::set(
+                &exact,
+                &JsValue::from_str("exact"),
+                &JsValue::from_str(&device_id),
+            ).unwrap();
+
+            log::info!("MicrophoneEncoder: deviceId.exact = {}", device_id);
+            media_info.set_device_id(&exact.into());
 
             constraints.set_audio(&media_info.into());
             constraints.set_video(&Boolean::from(false));

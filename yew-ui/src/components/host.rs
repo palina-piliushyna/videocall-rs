@@ -355,15 +355,21 @@ impl Component for Host {
             }
             Msg::AudioDeviceChanged(audio) => {
                 log::info!("Audio device changed: {audio}");
-                // Update the MediaDeviceList selection
                 self.media_devices.audio_inputs.select(&audio.device_id);
-                if self.microphone.select(audio.device_id.clone()) {
-                    let link = ctx.link().clone();
-                    let timeout = Timeout::new(1000, move || {
-                        link.send_message(Msg::EnableMicrophone(true));
-                    });
-                    timeout.forget();
+
+                let was_enabled = ctx.props().mic_enabled;
+
+                if was_enabled {
+                    self.microphone.stop();
                 }
+
+                self.microphone.select(audio.device_id.clone());
+
+                if was_enabled {
+                    self.microphone.set_enabled(true);
+                    self.microphone.start();
+                }
+
                 true // Need to re-render to update device selector displays
             }
             Msg::VideoDeviceChanged(video) => {
